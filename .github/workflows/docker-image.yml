@@ -1,0 +1,22 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the Docker image
+      run: |
+        TAG=$(echo ${GITHUB_REF} | sed -e "s/refs\/tags\///g")
+        echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
+        DOCKERNAME="infraway/${{ github.event.repository.name }}:${TAG}"
+        docker build -t ${DOCKERNAME} .
+        docker push ${DOCKERNAME}
+        docker logout
