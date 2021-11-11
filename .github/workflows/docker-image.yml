@@ -13,6 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build the Docker image
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       run: |
         TAG=$(echo ${GITHUB_REF} | sed -e "s/refs\/tags\///g")
         echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
