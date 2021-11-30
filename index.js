@@ -21,7 +21,6 @@ const getConfigFile = async (context, owner) => {
         });
         return content;
       } catch (e) {
-        // console.log('e', e);
         return;
       }
     }, Promise.resolve());
@@ -99,18 +98,15 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha }, comp
   const domain = config.domain;
   // find deploy by repo
   const deploy = config.deploy.find((d) => d.name === repo);
-  console.log('deploy', deploy, { owner, repo, pullNumber, sha });
   if (!deploy) {
     return [];
   }
 
   const charts = (deploy.components || [])
     .filter((c) => {
-      console.log('!components.length || componentsMap.get(c.name)', !components.length || componentsMap.get(c.name));
       return !components.length || componentsMap.get(c.name)
     })
     .map(({ name, chart, version, needs }) => {
-      console.log('.map(({ name, chart, version, needs })', { name, chart, version, needs });
       if (!chart) {
         const found = deploy.components.find(({ needs = [] }) => needs.includes(name));
         if (found && found.chart) {
@@ -127,7 +123,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha }, comp
     })
     .filter(({ chart }) => !!chart);
 
-  const deployCharts = await charts.reduce(async (acc, { name, version, chart }) => {
+  return charts.reduce(async (acc, { name, version, chart }) => {
     const val = await acc;
     let gitVersion;
     if (!version || version === 'commit') {
@@ -143,14 +139,11 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha }, comp
     const environment = `pr-${pullNumber}`;
     return [...val, { repo, component: name, gitVersion, version, chart, description, environment, domain }];
   }, Promise.resolve([]));
-
-
-  console.log('deployCharts', deployCharts);
-  return deployCharts;
 }
 
 const createDeployments = async (app, context, owner, payloads) => {
   await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain }) => {
+    app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -219,7 +212,7 @@ module.exports = (app) => {
       await syncConfig(context, owner);
 
       if (!pullNumber) {
-        app.log.debug(`Cannot find pull request. Deploy dismissed.`);
+        app.log.debug('Cannot find pull request. Deploy dismissed.');
         return;
       }
 
@@ -239,24 +232,23 @@ module.exports = (app) => {
       await createDeployments(app, context, owner, payloads);
     },
   );
-  app.on(
-    "deployment_status",
-    async (context) => {
-      app.log.info('deployment_status');
-      app.log.info(context.payload);
-    },
-  );
+  // app.on(
+  //   "deployment_status",
+  //   async (context) => {
+  //     app.log.info('deployment_status');
+  //     app.log.info(context.payload);
+  //   },
+  // );
   app.on(
     "status",
     async (context) => {
-      app.log.info('status');
-      app.log.info(context.payload);
       const {
         state,
         context: ctx,
         commit: { sha },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
+      app.log.info('status', { state, owner, repo, sha, ctx });
       if (state !== 'success' || !ctx && ctx.toString().match(/publish/) === null) {
         return;
       }
@@ -271,18 +263,18 @@ module.exports = (app) => {
       await createDeployments(app, context, owner, payloads);
     },
   );
-  app.on(
-    "check_run",
-    async (context) => {
-      app.log.info('check_run');
-      app.log.info(context.payload);
-    },
-  );
-  app.on(
-    "check_suite",
-    async (context) => {
-      app.log.info('check_suite');
-      app.log.info(context.payload);
-    },
-  );
+  // app.on(
+  //   "check_run",
+  //   async (context) => {
+  //     app.log.info('check_run');
+  //     app.log.info(context.payload);
+  //   },
+  // );
+  // app.on(
+  //   "check_suite",
+  //   async (context) => {
+  //     app.log.info('check_suite');
+  //     app.log.info(context.payload);
+  //   },
+  // );
 };
