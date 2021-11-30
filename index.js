@@ -248,8 +248,9 @@ module.exports = (app) => {
         commit: { sha },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
-      app.log.info('status', { state, owner, repo, sha, ctx });
-      if (state !== 'success' || !ctx && ctx.toString().match(/publish/) === null) {
+      app.log.info('status');
+      app.log.info({ state, owner, repo, sha, ctx });
+      if (state !== 'success' || !ctx || ctx.toString().match(/publish/) === null) {
         return;
       }
       await syncConfig(context, owner);
