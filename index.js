@@ -248,11 +248,11 @@ module.exports = (app) => {
         commit: { sha },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
-      app.log.info('status');
-      app.log.info({ state, owner, repo, sha, ctx });
       if (state !== 'success' || !ctx || ctx.toString().match(/publish/) === null) {
         return;
       }
+      app.log.info('status');
+      app.log.info({ state, owner, repo, sha, ctx });
       await syncConfig(context, owner);
 
       const pullNumber = await findOpenPullRequestNumber(context, owner, repo, sha);
