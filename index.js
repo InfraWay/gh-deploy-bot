@@ -258,6 +258,7 @@ module.exports = (app) => {
       const pullNumber = await findOpenPullRequestNumber(context, owner, repo, sha);
       if (!pullNumber) {
         app.log.debug(`Open pull request for sha ${sha} cannot be find. Deploy dismissed.`);
+        return;
       }
 
       const payloads = await getDeployPayloads(context, { owner, repo, pullNumber, sha });
