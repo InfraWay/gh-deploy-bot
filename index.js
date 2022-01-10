@@ -198,9 +198,9 @@ module.exports = (app) => {
       } = context.payload;
       if (
         !comment ||
-        comment.indexOf(command) !== -1
+        comment.indexOf(command) === -1
       ) {
-        app.log.debug(`Missing comment body or comment doesn't start with /deploy message`);
+        app.log.info(`Missing comment body or comment doesn't start with /deploy message`);
         return;
       }
       app.log.info('issue_comment.created');
@@ -212,7 +212,7 @@ module.exports = (app) => {
       await syncConfig(context, owner);
 
       if (!pullNumber) {
-        app.log.debug('Cannot find pull request. Deploy dismissed.');
+        app.log.info('Cannot find pull request. Deploy dismissed.');
         return;
       }
 
@@ -220,6 +220,7 @@ module.exports = (app) => {
         .toLowerCase()
         .substr(command.length)
         .split(' ')
+        .filter(Boolean)
         .map((component) => {
           const parts = component.split(':');
           return {
