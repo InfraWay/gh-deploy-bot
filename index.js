@@ -162,8 +162,8 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
 }
 
 const createDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain }) => {
-    app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain });
+  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action }) => {
+    app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain, action });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -176,6 +176,7 @@ const createDeployments = async (app, context, owner, payloads) => {
         chart,
         version,
         component,
+        action,
         gitVersion,
         domain: `${environment}.${domain}`,
         environment,
@@ -202,8 +203,8 @@ const createDeployments = async (app, context, owner, payloads) => {
 };
 
 const deleteDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain }) => {
-    app.log.info({ repo, component, environment, description, domain });
+  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain, action }) => {
+    app.log.info({ repo, component, environment, description, domain, action });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -215,6 +216,7 @@ const deleteDeployments = async (app, context, owner, payloads) => {
         repo,
         component,
         domain: `${environment}.${domain}`,
+        action,
         environment,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
