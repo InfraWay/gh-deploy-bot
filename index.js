@@ -331,18 +331,23 @@ module.exports = (app) => {
     },
   );
   app.on(
-    "pull_request.closed",
+    "pull_request",
     async (context) => {
       const {
         context: ctx,
         pull_request: { number: pullNumber },
         repository: { owner: { login: owner }, name: repo },
+        action,
       } = context.payload;
-      if (!pullNumber) {
-        app.log.debug(`Close pull request cannot be found. Deploy dismissed.`);
+      if (['closed', 'merged'].includes(action)) {
+        app.log.info(`Action on pull request. But action ${action} is not appropriate. Skipping...`);
         return;
       }
-      app.log.info('pull_request.closed');
+      if (!pullNumber) {
+        app.log.info(`Close pull request cannot be found. Delete dismissed.`);
+        return;
+      }
+      app.log.info(`pull_request.${action}`);
       app.log.info({ owner, repo, ctx, pullNumber });
       await syncConfig(context, owner);
 
