@@ -136,8 +136,28 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha }, comp
       gitVersion = version;
     }
     const description = `Deploy ${chart} for ${repo}/pull/${pullNumber}`;
-    const environment = `pr-${pullNumber}`;
-    return [...val, { repo, component: name, gitVersion, version, chart, description, environment, domain }];
+    const environment = `${name}-pull-${pullNumber}`;
+    return [...val, { repo, component: name, gitVersion, version, chart, description, environment, domain, action: 'deploy' }];
+  }, Promise.resolve([]));
+}
+
+const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
+  const config = getConfig(owner);
+  const domain = config.domain;
+  // find deploy by repo
+  const deploy = config.deploy.find((d) => d.name === repo);
+  if (!deploy) {
+    return [];
+  }
+
+  const charts = deploy.components
+    .map(({ name }) => ({ name }));
+
+  return charts.reduce(async (acc, { name }) => {
+    const val = await acc;
+    const description = `Delete ${name} for ${repo}/pull/${pullNumber}`;
+    const environment = `${name}-pull-${pullNumber}`;
+    return [...val, { repo, component: name, description, environment, domain, action: 'delete' }];
   }, Promise.resolve([]));
 }
 
@@ -179,6 +199,48 @@ const createDeployments = async (app, context, owner, payloads) => {
       auto_inactive: true, // Adds a new inactive status to all prior non-transient, non-production environment deployments with the same repository and environment name as the created status's deployment. An inactive status is only added to deployments that had a success state.
     });
   });
+};
+
+const deleteDeployments = async (app, context, owner, payloads) => {
+  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain }) => {
+    app.log.info({ repo, component, environment, description, domain });
+    const res = await context.octokit.repos.createDeployment({
+      owner: owner,
+      repo: 'charts',
+      ref: 'master', // The ref to deploy. This can be a branch, tag, or SHA.
+      task: 'delete', // Specifies a task to execute (e.g., deploy or deploy:migrations).
+      auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
+      required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
+      payload: {
+        repo,
+        component,
+        domain: `${environment}.${domain}`,
+        environment,
+      }, // JSON payload with extra information about the deployment. Default: ""
+      environment, // Name for the target deployment environment (e.g., production, staging, qa)
+      description, // Short description of the deployment
+      transient_environment: true, // Specifies if the given environment is specific to the deployment and will no longer exist at some point in the future.
+      production_environment: false, // Specifies if the given environment is one that end-users directly interact with.
+    });
+    app.log.info(`Created delete deployment #${res.data.id} for pull request ${environment}`);
+  });
+  if (payloads.length === 0) {
+    return;
+  }
+  const environment = payloads[0].environment;
+  // find all deployments related to environment
+  const deployments = await context.octokit.repos.listDeployments({
+    owner: owner,
+    repo: 'charts',
+    ref: 'master',
+    environment,
+  })
+  await bluebird.mapSeries(deployments, ({ id }) => context.octokit.repos.deleteDeployment({
+      owner: owner,
+      repo: 'charts',
+      deployment_id: id,
+    }),
+  );
 };
 
 /**
@@ -264,6 +326,26 @@ module.exports = (app) => {
 
       const payloads = await getDeployPayloads(context, { owner, repo, pullNumber, sha });
       await createDeployments(app, context, owner, payloads);
+    },
+  );
+  app.on(
+    "pull_request.closed",
+    async (context) => {
+      const {
+        context: ctx,
+        pull_request: { number: pullNumber },
+        repository: { owner: { login: owner }, name: repo },
+      } = context.payload;
+      if (!pullNumber) {
+        app.log.debug(`Close pull request cannot be found. Deploy dismissed.`);
+        return;
+      }
+      app.log.info('pull_request.closed');
+      app.log.info({ owner, repo, ctx, pullNumber });
+      await syncConfig(context, owner);
+
+      const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+      await deleteDeployments(app, context, owner, payloads);
     },
   );
   // app.on(
