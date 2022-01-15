@@ -2,10 +2,10 @@
   "name": "gh-deploy-bot",
   "version": "1.0.0",
   "private": true,
-  "description": "Comment to deploy",
+  "description": "Pull deploy bot",
   "author": "Andrew Red <andrew@reddikh.com>",
   "license": "ISC",
-  "homepage": "https://github.com/infraway/https://github.com/InfraWay/deploy-bot",
+  "homepage": "https://github.com/InfraWay/deploy-bot",
   "keywords": [
     "probot",
     "github",
