@@ -340,7 +340,7 @@ module.exports = (app) => {
     async (context) => {
       const {
         context: ctx,
-        commit: { sha },
+        head_commit: { id: sha },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
       app.log.info('push');
@@ -366,10 +366,6 @@ module.exports = (app) => {
         repository: { owner: { login: owner }, name: repo },
         action,
       } = context.payload;
-      if (!['closed', 'merged'].includes(action)) {
-        app.log.info(`Action on pull request. But action ${action} is not appropriate. Skipping...`);
-        return;
-      }
       if (!pullNumber) {
         app.log.info(`Close pull request cannot be found. Delete dismissed.`);
         return;
