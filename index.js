@@ -92,7 +92,7 @@ const syncConfig = async (context, owner) => {
   }
 }
 
-const getDeployPayloads = async (context, { owner, repo, pullNumber, sha }, components = []) => {
+const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = []) => {
   const config = getConfig(owner);
   const componentsMap = new Map(components.map((c) => [c.component, c]));
   const domain = config.domain;
@@ -336,6 +336,28 @@ module.exports = (app) => {
     },
   );
   app.on(
+    "push",
+    async (context) => {
+      const {
+        context: ctx,
+        commit: { sha },
+        repository: { owner: { login: owner }, name: repo },
+      } = context.payload;
+      app.log.info('push');
+      app.log.info({ owner, repo, sha, ctx });
+      await syncConfig(context, owner);
+
+      const pullNumber = await findOpenPullRequestNumber(context, owner, repo, sha);
+      if (!pullNumber) {
+        app.log.debug(`Open pull request for sha ${sha} cannot be find. Deploy dismissed.`);
+        return;
+      }
+
+      const payloads = await getDeployPayloads(context, { owner, repo, pullNumber, sha });
+      await createDeployments(app, context, owner, payloads);
+    },
+  );
+  app.on(
     "pull_request",
     async (context) => {
       const {
@@ -356,8 +378,16 @@ module.exports = (app) => {
       app.log.info({ owner, repo, ctx, pullNumber });
       await syncConfig(context, owner);
 
-      const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
-      await deleteDeployments(app, context, owner, payloads);
+      if (['opened', 'reopened'].includes(action)) {
+        const payloads = await getDeployPayloads(context, { owner, repo, pullNumber });
+        await createDeployments(app, context, owner, payloads);
+      }
+
+      if (['closed', 'merged'].includes(action)) {
+        app.log.info(`Action on pull request. But action ${action} is not appropriate. Skipping...`);
+        const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+        await deleteDeployments(app, context, owner, payloads);
+      }
     },
   );
   // app.on(
