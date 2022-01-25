@@ -231,13 +231,18 @@ const deleteDeployments = async (app, context, owner, payloads) => {
   }
   const environment = payloads[0].environment;
   // find all deployments related to environment
-  const deployments = await context.octokit.repos.listDeployments({
+  app.log.info('context.octokit.repos.listDeployments');
+  app.log.info({ owner: owner, repo: 'charts', ref: 'master', environment });
+  const deploymentsList = await context.octokit.repos.listDeployments({
     owner: owner,
     repo: 'charts',
     ref: 'master',
     environment,
-  })
-  await bluebird.mapSeries(deployments, ({ id }) => context.octokit.repos.deleteDeployment({
+  });
+  app.log.info('deploymentsList');
+  app.log.info(deploymentsList);
+  const deployments = (deploymentsList && deploymentsList.data) || [];
+  await bluebird.mapSeries(deployments || [], ({ id }) => context.octokit.repos.deleteDeployment({
       owner: owner,
       repo: 'charts',
       deployment_id: id,
@@ -339,7 +344,7 @@ module.exports = (app) => {
         repository: { owner: { login: owner }, name: repo },
         action,
       } = context.payload;
-      if (['closed', 'merged'].includes(action)) {
+      if (!['closed', 'merged'].includes(action)) {
         app.log.info(`Action on pull request. But action ${action} is not appropriate. Skipping...`);
         return;
       }
