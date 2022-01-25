@@ -226,28 +226,28 @@ const deleteDeployments = async (app, context, owner, payloads) => {
     });
     app.log.info(`Created delete deployment #${res.data.id} for pull request ${environment}`);
   });
-  if (payloads.length === 0) {
-    return;
-  }
-  const environment = payloads[0].environment;
-  // find all deployments related to environment
-  app.log.info('context.octokit.repos.listDeployments');
-  app.log.info({ owner: owner, repo: 'charts', ref: 'master', environment });
-  const deploymentsList = await context.octokit.repos.listDeployments({
-    owner: owner,
-    repo: 'charts',
-    ref: 'master',
-    environment,
-  });
-  app.log.info('deploymentsList');
-  app.log.info(deploymentsList);
-  const deployments = (deploymentsList && deploymentsList.data) || [];
-  await bluebird.mapSeries(deployments || [], ({ id }) => context.octokit.repos.deleteDeployment({
-      owner: owner,
-      repo: 'charts',
-      deployment_id: id,
-    }),
-  );
+  // if (payloads.length === 0) {
+  //   return;
+  // }
+  // const environment = payloads[0].environment;
+  // // find all deployments related to environment
+  // app.log.info('context.octokit.repos.listDeployments');
+  // app.log.info({ owner: owner, repo: 'charts', ref: 'master', environment });
+  // const deploymentsList = await context.octokit.repos.listDeployments({
+  //   owner: owner,
+  //   repo: 'charts',
+  //   ref: 'master',
+  //   environment,
+  // });
+  // app.log.info('deploymentsList');
+  // app.log.info(deploymentsList);
+  // const deployments = (deploymentsList && deploymentsList.data) || [];
+  // await bluebird.mapSeries(deployments || [], ({ id }) => context.octokit.repos.deleteDeployment({
+  //     owner: owner,
+  //     repo: 'charts',
+  //     deployment_id: id,
+  //   }),
+  // );
 };
 
 /**
