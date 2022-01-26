@@ -187,18 +187,6 @@ const createDeployments = async (app, context, owner, payloads) => {
       production_environment: false, // Specifies if the given environment is one that end-users directly interact with.
     });
     app.log.info(`Created deployment #${res.data.id} for pull request ${environment}`);
-
-    const deploymentId = res.data.id;
-    await context.octokit.repos.createDeploymentStatus({
-      owner,
-      repo: 'charts',
-      deployment_id: deploymentId,
-      state: 'pending', // The state of the status. Can be one of error, failure, inactive, pending, or success
-      description, // A short description of the status.
-      environment,
-      environment_url: `https://${environment}.${domain}`, // Sets the URL for accessing your environment.
-      auto_inactive: true, // Adds a new inactive status to all prior non-transient, non-production environment deployments with the same repository and environment name as the created status's deployment. An inactive status is only added to deployments that had a success state.
-    });
   });
 };
 
@@ -299,39 +287,6 @@ module.exports = (app) => {
         });
 
       const payloads = await getDeployPayloads(context, { owner, repo, pullNumber }, components);
-      await createDeployments(app, context, owner, payloads);
-    },
-  );
-  // app.on(
-  //   "deployment_status",
-  //   async (context) => {
-  //     app.log.info('deployment_status');
-  //     app.log.info(context.payload);
-  //   },
-  // );
-  app.on(
-    "status",
-    async (context) => {
-      const {
-        state,
-        context: ctx,
-        commit: { sha },
-        repository: { owner: { login: owner }, name: repo },
-      } = context.payload;
-      if (state !== 'success' || !ctx || ctx.toString().match(/publish/) === null) {
-        return;
-      }
-      app.log.info('status');
-      app.log.info({ state, owner, repo, sha, ctx });
-      await syncConfig(context, owner);
-
-      const pullNumber = await findOpenPullRequestNumber(context, owner, repo, sha);
-      if (!pullNumber) {
-        app.log.debug(`Open pull request for sha ${sha} cannot be find. Deploy dismissed.`);
-        return;
-      }
-
-      const payloads = await getDeployPayloads(context, { owner, repo, pullNumber, sha });
       await createDeployments(app, context, owner, payloads);
     },
   );
