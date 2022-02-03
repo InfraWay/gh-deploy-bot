@@ -166,7 +166,7 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
   return charts.reduce(async (acc, { name }) => {
     const val = await acc;
     const description = `Delete ${name} for ${repo}/pull/${pullNumber}`;
-    const environment = `${name}-pull-${pullNumber}`;
+    const environment = `${repo}-pull-${pullNumber}`;
     return [...val, { repo, component: name, description, environment, domain, action: 'delete' }];
   }, Promise.resolve([]));
 }
