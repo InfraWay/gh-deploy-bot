@@ -123,7 +123,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
     })
     .filter(({ chart }) => !!chart);
 
-  return charts.reduce(async (acc, { name, version, chart }) => {
+  return charts.reduce(async (acc, { name, version, chart, repo: componentRepo }) => {
     const val = await acc;
     let gitVersion;
     if (!version || version === 'commit') {
@@ -132,7 +132,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       version = version.substr(0, 7);
     }
     if (version === 'release') {
-      version = await getLatestReleaseTag(context, owner, repo);
+      version = await getLatestReleaseTag(context, owner, componentRepo || repo);
       gitVersion = version;
     }
     const description = `Deploy ${chart} for ${repo}/pull/${pullNumber}`;

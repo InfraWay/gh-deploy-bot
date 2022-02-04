@@ -9,7 +9,8 @@ deploy:
           - static
         version: commit
       - name: static
-        version: commit
+        version: release
+        repo: repo-name2
       - name: api
         chart: ./charts/web.api
         needs:
