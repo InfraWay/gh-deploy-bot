@@ -321,7 +321,7 @@ module.exports = (app) => {
       }
 
       const payloads = await getDeployPayloads(
-        context, { owner, repo, pullNumber, sha }, 'push',
+        context, { owner, repo, pullNumber, sha }, [],'push',
       );
       await createDeployments(app, context, owner, payloads);
     },
@@ -345,7 +345,7 @@ module.exports = (app) => {
 
       if (['opened', 'reopened'].includes(action)) {
         const payloads = await getDeployPayloads(
-          context, { owner, repo, pullNumber }, 'pull_request',
+          context, { owner, repo, pullNumber }, [],'pull_request',
         );
         await createDeployments(app, context, owner, payloads);
       }
