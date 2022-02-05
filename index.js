@@ -92,7 +92,7 @@ const syncConfig = async (context, owner) => {
   }
 }
 
-const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = []) => {
+const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = [], action = '') => {
   const config = getConfig(owner);
   const componentsMap = new Map(components.map((c) => [c.component, c]));
   const domain = config.domain;
@@ -104,7 +104,11 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
 
   const charts = (deploy.components || [])
     .filter((c) => {
-      return !components.length || componentsMap.get(c.name)
+      return (
+        // filter by passed components
+        (!components.length || componentsMap.get(c.name)) &&
+        (action !== 'push' || !c.addon)
+      );
     })
     .map(({ name, chart, version, needs }) => {
       if (!chart) {
@@ -136,16 +140,16 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       gitVersion = version;
     }
     const description = `Deploy ${chart} for ${repo}/pull/${pullNumber}`;
-    const environment = `${repo}-pull-${pullNumber}`;
+    const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
     return [...val, {
       repo,
-      component: name,
+      component: name.replace('.', '-'),
       gitVersion,
       version,
       chart,
       description,
       environment,
-      domain,
+      domain: `${environment}.${domain}`,
       action: 'deploy'
     }];
   }, Promise.resolve([]));
@@ -166,8 +170,15 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
   return charts.reduce(async (acc, { name }) => {
     const val = await acc;
     const description = `Delete ${name} for ${repo}/pull/${pullNumber}`;
-    const environment = `${repo}-pull-${pullNumber}`;
-    return [...val, { repo, component: name, description, environment, domain, action: 'delete' }];
+    const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
+    return [...val, {
+      repo,
+      component: name.replace('.', '-'),
+      description,
+      environment,
+      domain: `${environment}.${domain}`,
+      action: 'delete',
+    }];
   }, Promise.resolve([]));
 }
 
@@ -182,14 +193,7 @@ const createDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo,
-        chart,
-        version,
-        component,
-        action,
-        gitVersion,
-        domain: `${environment}.${domain}`,
-        environment,
+        repo, chart, version, gitVersion, component, action, domain, environment,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
@@ -211,11 +215,7 @@ const deleteDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo,
-        component,
-        domain: `${environment}.${domain}`,
-        action,
-        environment,
+        repo, component, domain, action, environment,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
@@ -296,7 +296,9 @@ module.exports = (app) => {
           };
         });
 
-      const payloads = await getDeployPayloads(context, { owner, repo, pullNumber }, components);
+      const payloads = await getDeployPayloads(
+        context, { owner, repo, pullNumber }, components, 'comment',
+      );
       await createDeployments(app, context, owner, payloads);
     },
   );
@@ -318,7 +320,9 @@ module.exports = (app) => {
         return;
       }
 
-      const payloads = await getDeployPayloads(context, { owner, repo, pullNumber, sha });
+      const payloads = await getDeployPayloads(
+        context, { owner, repo, pullNumber, sha }, 'push',
+      );
       await createDeployments(app, context, owner, payloads);
     },
   );
@@ -340,7 +344,9 @@ module.exports = (app) => {
       await syncConfig(context, owner);
 
       if (['opened', 'reopened'].includes(action)) {
-        const payloads = await getDeployPayloads(context, { owner, repo, pullNumber });
+        const payloads = await getDeployPayloads(
+          context, { owner, repo, pullNumber }, 'pull_request',
+        );
         await createDeployments(app, context, owner, payloads);
       }
 
@@ -351,18 +357,4 @@ module.exports = (app) => {
       }
     },
   );
-  // app.on(
-  //   "check_run",
-  //   async (context) => {
-  //     app.log.info('check_run');
-  //     app.log.info(context.payload);
-  //   },
-  // );
-  // app.on(
-  //   "check_suite",
-  //   async (context) => {
-  //     app.log.info('check_suite');
-  //     app.log.info(context.payload);
-  //   },
-  // );
 };

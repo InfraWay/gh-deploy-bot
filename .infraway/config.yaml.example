@@ -13,11 +13,14 @@ deploy:
         repo: repo-name2
       - name: api
         chart: ./charts/web.api
-        needs:
+        needs: # a dependency on another component, when deploy happens, both components will be redeployed
           - db
         version: commit
       - name: db
         version: data
+      - name: mailer
+        addon: true # a component which is not installed by default with push, but can be added by a comment
+        version: release
   - name: repo-name2
     components:
       - name: web
