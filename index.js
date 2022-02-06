@@ -110,7 +110,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
         (action === 'comment' || !c.addon)
       );
     })
-    .map(({ name, chart, version, needs }) => {
+    .map(({ name, chart, version, needs, addon }) => {
       if (!chart) {
         const found = deploy.components.find(({ needs = [] }) => needs.includes(name));
         if (found && found.chart) {
@@ -118,12 +118,11 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
         }
       }
       const versionOverwrite = componentsMap.get(name);
-      logger && logger.info(`name=${name}, version=${version}, versionOverwrite=${versionOverwrite.version}`);
-      if (versionOverwrite) {
+      if (versionOverwrite && versionOverwrite.version) {
         version = versionOverwrite.version;
       }
       return {
-        name, chart, version,
+        name, chart, version, addon,
       };
     })
     .filter(({ chart }) => !!chart);
