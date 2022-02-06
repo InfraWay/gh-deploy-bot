@@ -92,7 +92,7 @@ const syncConfig = async (context, owner) => {
   }
 }
 
-const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = [], action = '') => {
+const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = [], action = '', logger = null) => {
   const config = getConfig(owner);
   const componentsMap = new Map(components.map((c) => [c.component, c]));
   const domain = config.domain;
@@ -107,7 +107,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       return (
         // filter by passed components
         (!components.length || componentsMap.get(c.name)) &&
-        (action !== 'push' || !c.addon)
+        (action === 'comment' || !c.addon)
       );
     })
     .map(({ name, chart, version, needs }) => {
@@ -118,6 +118,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
         }
       }
       const versionOverwrite = componentsMap.get(name);
+      logger && logger.info(`name=${name}, version=${version}, versionOverwrite=${versionOverwrite.version}`);
       if (versionOverwrite) {
         version = versionOverwrite.version;
       }
@@ -127,7 +128,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
     })
     .filter(({ chart }) => !!chart);
 
-  return charts.reduce(async (acc, { name, version, chart }) => {
+  return charts.reduce(async (acc, { name, version, chart, addon }) => {
     const val = await acc;
     let gitVersion;
     if (!version || version === 'commit') {
@@ -144,6 +145,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
     return [...val, {
       repo,
       component: name.replace('.', '-'),
+      addon,
       gitVersion,
       version,
       chart,
@@ -183,7 +185,7 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
 }
 
 const createDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action }) => {
+  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action, addon = false }) => {
     app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain, action });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
@@ -193,7 +195,7 @@ const createDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo, chart, version, gitVersion, component, action, domain, environment,
+        repo, chart, version, gitVersion, component, action, domain, environment, addon,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
@@ -296,9 +298,13 @@ module.exports = (app) => {
           };
         });
 
+      app.log.info('comment>deploy');
+      app.log.info(components);
+
       const payloads = await getDeployPayloads(
-        context, { owner, repo, pullNumber }, components, 'comment',
+        context, { owner, repo, pullNumber }, components, 'comment', app.log,
       );
+      app.log.info(payloads);
       await createDeployments(app, context, owner, payloads);
     },
   );
