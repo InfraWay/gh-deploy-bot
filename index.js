@@ -110,7 +110,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
         (action === 'comment' || !c.addon)
       );
     })
-    .map(({ name, chart, version, needs, addon }) => {
+    .map(({ name, chart, version, needs, addon, values }) => {
       if (!chart) {
         const found = deploy.components.find(({ needs = [] }) => needs.includes(name));
         if (found && found.chart) {
@@ -122,12 +122,12 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
         version = versionOverwrite.version;
       }
       return {
-        name, chart, version, addon,
+        name, chart, version, addon, values,
       };
     })
     .filter(({ chart }) => !!chart);
 
-  return charts.reduce(async (acc, { name, version, chart, addon }) => {
+  return charts.reduce(async (acc, { name, version, chart, addon, values }) => {
     const val = await acc;
     let gitVersion;
     if (!version || version === 'commit') {
@@ -150,6 +150,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       chart,
       description,
       environment,
+      values,
       domain: `${environment}.${domain}`,
       action: 'deploy'
     }];
@@ -184,8 +185,8 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
 }
 
 const createDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action, addon = false }) => {
-    app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain, action });
+  await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action, values, addon = false }) => {
+    app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain, action, values });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -194,7 +195,7 @@ const createDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo, chart, version, gitVersion, component, action, domain, environment, addon,
+        repo, chart, version, gitVersion, component, action, domain, environment, addon, values,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
@@ -297,13 +298,9 @@ module.exports = (app) => {
           };
         });
 
-      app.log.info('comment>deploy');
-      app.log.info(components);
-
       const payloads = await getDeployPayloads(
         context, { owner, repo, pullNumber }, components, 'comment', app.log,
       );
-      app.log.info(payloads);
       await createDeployments(app, context, owner, payloads);
     },
   );
