@@ -141,16 +141,17 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
     }
     const description = `Deploy ${chart} for ${repo}/pull/${pullNumber}`;
     const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
+    const component = name.replace('.', '-');
     return [...val, {
       repo,
-      component: name.replace('.', '-'),
+      component,
       addon,
       gitVersion,
       version,
       chart,
       description,
       environment,
-      values: values || name,
+      values: values || component,
       domain: `${environment}.${domain}`,
       action: 'deploy'
     }];
