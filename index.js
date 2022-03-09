@@ -150,7 +150,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       chart,
       description,
       environment,
-      values,
+      values: values || name,
       domain: `${environment}.${domain}`,
       action: 'deploy'
     }];
