@@ -99,6 +99,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
   // find deploy by repo
   const deploy = config.deploy.find((d) => d.name === repo);
   if (!deploy) {
+    logger.info(`getDeployPayloads> Deploy ${deploy} cannot be found in config`);
     return [];
   }
 
@@ -127,7 +128,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
     })
     .filter(({ chart }) => !!chart);
 
-  return charts.reduce(async (acc, { name, version, chart, addon, values }) => {
+  const deployPayloads = charts.reduce(async (acc, { name, version, chart, addon, values }) => {
     const val = await acc;
     let gitVersion;
     if (!version || version === 'commit') {
@@ -156,6 +157,11 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       action: 'deploy'
     }];
   }, Promise.resolve([]));
+
+  logger.info('getDeployPayloads> found payloads');
+  logger.info(JSON.stringify(deployPayloads));
+
+  return deployPayloads;
 }
 
 const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
@@ -299,6 +305,8 @@ module.exports = (app) => {
           };
         });
 
+      app.log.info('extracted comment components');
+      app.log.info(JSON.stringify(components));
       const payloads = await getDeployPayloads(
         context, { owner, repo, pullNumber }, components, 'comment', app.log,
       );
