@@ -267,14 +267,15 @@ module.exports = (app) => {
   app.on(
     "issue_comment.created",
     async (context) => {
-      const command = '\deploy'
+      const commandRegex = /^[\\\|\/\#]deploy([^$]+)$/;
       const {
         comment: { body: comment },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
+      let matched;
       if (
         !comment ||
-        comment.indexOf(command) === -1
+        !(matched = comment.toLowerCase().match(commandRegex))
       ) {
         app.log.info(`Missing comment body or comment doesn't start with /deploy message`);
         return;
@@ -292,10 +293,8 @@ module.exports = (app) => {
         return;
       }
 
-      const components = context.payload.comment.body
-        .toLowerCase()
-        .substr(command.length)
-        .split(' ')
+      const components = matched[1]
+        .split(/\s|\n/)
         .filter(Boolean)
         .map((component) => {
           const parts = component.split(':');
@@ -332,7 +331,7 @@ module.exports = (app) => {
       }
 
       const payloads = await getDeployPayloads(
-        context, { owner, repo, pullNumber, sha }, [],'push',
+        context, { owner, repo, pullNumber, sha }, [],'push', app.log,
       );
       await createDeployments(app, context, owner, payloads);
     },
@@ -356,7 +355,7 @@ module.exports = (app) => {
 
       if (['opened', 'reopened'].includes(action)) {
         const payloads = await getDeployPayloads(
-          context, { owner, repo, pullNumber }, [],'pull_request',
+          context, { owner, repo, pullNumber }, [],'pull_request', app.log,
         );
         await createDeployments(app, context, owner, payloads);
       }
