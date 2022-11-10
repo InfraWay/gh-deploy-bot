@@ -324,6 +324,11 @@ module.exports = (app) => {
       app.log.info({ owner, repo, sha, ctx });
       await syncConfig(context, owner);
 
+      const config = getConfig(owner);
+      const { commit: commitEvent } = config.events || { commit: 'deploy' };
+      if (commitEvent === 'ignore') {
+        return;
+      }
       const pullNumber = await findOpenPullRequestNumber(context, owner, repo, sha);
       if (!pullNumber) {
         app.log.debug(`Open pull request for sha ${sha} cannot be find. Deploy dismissed.`);
@@ -353,6 +358,11 @@ module.exports = (app) => {
       app.log.info({ owner, repo, ctx, pullNumber });
       await syncConfig(context, owner);
 
+      const config = getConfig(owner);
+      const { pull_request: prEvent } = config.events || { pull_request: 'deploy' };
+      if (prEvent === 'ignore') {
+        return;
+      }
       if (['opened', 'reopened'].includes(action)) {
         const payloads = await getDeployPayloads(
           context, { owner, repo, pullNumber }, [],'pull_request', app.log,

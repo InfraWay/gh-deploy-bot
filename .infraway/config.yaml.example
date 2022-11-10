@@ -1,5 +1,10 @@
 domain: domain.tech
 
+events:
+  pull_request: "deploy" # or "ignore", deploy by default
+  commit: "deploy" # or "ignore", deploy by default
+
+
 deploy:
   - name: repo-name1
     components:
