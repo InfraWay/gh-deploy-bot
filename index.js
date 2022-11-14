@@ -267,7 +267,7 @@ module.exports = (app) => {
   app.on(
     "issue_comment.created",
     async (context) => {
-      const commandRegex = /^[\\\|\/\#]deploy([^$]+)$/;
+      const commandRegex = /^[\\\|\/\#]deploy([^$]*)$/;
       const {
         comment: { body: comment },
         repository: { owner: { login: owner }, name: repo },
@@ -277,7 +277,7 @@ module.exports = (app) => {
         !comment ||
         !(matched = comment.toLowerCase().match(commandRegex))
       ) {
-        app.log.info(`Missing comment body or comment doesn't start with /deploy message`);
+        app.log.info(`Missing comment body or comment doesn't start with /deploy message, body: ${comment}`);
         return;
       }
       app.log.info('issue_comment.created');
