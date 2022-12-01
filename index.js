@@ -1,6 +1,7 @@
 const { Buffer } = require('buffer');
 const yaml = require('js-yaml');
 const bluebird = require('bluebird');
+const { sub } = require("date-fns");
 
 const getConfigFile = async (context, owner) => {
   const repoPaths = {
@@ -74,6 +75,49 @@ const getLatestCommitInPullRequest = async (context, owner, repo, pullNumber) =>
   return pull.data.head.sha;
 };
 
+const getStalePulls = async (context, owner) => {
+  const {
+    deploy,
+    stale_pull_cleanup: cleanupPolicy,
+  } = getConfig(owner);
+  if (!cleanupPolicy.enabled) {
+    return;
+  }
+  const duration = (cleanupPolicy.duration || '7 days').split(' ');
+  const filterDate = sub(new Date(), { [duration[1]]: parseInt(duration[0], 10) });
+  const repos = deploy.map((d) => d.name);
+  return repos.reduce(async (acc, repo) => {
+    const foundPulls = await context.octokit.pulls.list({
+      owner,
+      repo,
+      state: 'open',
+      sort: 'updated',
+      direction: 'asc',
+    });
+    acc.push(
+      ...foundPulls
+        .filter((p) => new Date(p.updated_at) < filterDate)
+        .map((p) => ({ pullNumber: p.number, owner, repo }))
+    );
+  }, []);
+}
+
+const stalePromise = {};
+const syncStale = async (app, context, owner) => {
+  if (!stalePromise[owner]) {
+    stalePromise[owner] = new Promise((resolve, reject) => {
+      setInterval(async () => {
+        const pulls = await getStalePulls(context, owner);
+        await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
+          app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
+          // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+          // await deleteDeployments(app, context, owner, payloads);
+        }, Promise.resolve());
+      }, 20 * 60 * 1000);
+    });
+  }
+}
+
 const configMap = {};
 const configMapPromise = {};
 const getConfig = (owner) => configMap[owner];
@@ -91,6 +135,11 @@ const syncConfig = async (context, owner) => {
     });
   }
 }
+
+const sync = async (app, context, owner) => {
+  await syncConfig(context, owner);
+  await syncStale(app, context, owner);
+};
 
 const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' }, components = [], action = '', logger = null) => {
   const config = getConfig(owner);
@@ -154,7 +203,7 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
       environment,
       values: values || component,
       domain: `${environment}.${domain}`,
-      action: 'deploy'
+      action: 'deploy',
     }];
   }, Promise.resolve([]));
 
@@ -262,8 +311,7 @@ const deleteDeployments = async (app, context, owner, payloads) => {
  * @param {import('probot').Probot} app
  */
 module.exports = (app) => {
-  // Your code here
-  app.log.info("Yay, the app was loaded!");
+  app.log.info("Bot started!");
   app.on(
     "issue_comment.created",
     async (context) => {
@@ -286,7 +334,7 @@ module.exports = (app) => {
       const pullNumber = context.payload.issue.html_url.indexOf('/pull/')
         ? context.payload.issue.number : null;
 
-      await syncConfig(context, owner);
+      await sync(context, owner);
 
       if (!pullNumber) {
         app.log.info('Cannot find pull request. Deploy dismissed.');
@@ -322,7 +370,7 @@ module.exports = (app) => {
       } = context.payload;
       app.log.info('push');
       app.log.info({ owner, repo, sha, ctx });
-      await syncConfig(context, owner);
+      await sync(context, owner);
 
       const config = getConfig(owner);
       const { commit: commitEvent } = config.events || { commit: 'deploy' };
@@ -356,7 +404,7 @@ module.exports = (app) => {
       }
       app.log.info(`pull_request.${action}`);
       app.log.info({ owner, repo, ctx, pullNumber });
-      await syncConfig(context, owner);
+      await sync(context, owner);
 
       const config = getConfig(owner);
       const { pull_request: prEvent } = config.events || { pull_request: 'deploy' };

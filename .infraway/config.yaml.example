@@ -4,6 +4,9 @@ events:
   pull_request: "deploy" # or "ignore", deploy by default
   commit: "deploy" # or "ignore", deploy by default
 
+stale_pull_cleanup:
+  enabled: true
+  duration: "7 days"
 
 deploy:
   - name: repo-name1

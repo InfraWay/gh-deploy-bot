@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "bluebird": "^3.7.2",
+    "date-fns": "^2.29.3",
     "js-yaml": "^4.1.0",
     "probot": "^11.0.1"
   },
