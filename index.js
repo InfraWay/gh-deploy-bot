@@ -154,11 +154,12 @@ const getDeployPayloads = async (context, { owner, repo, pullNumber, sha = '' },
 
   const charts = (deploy.components || [])
     .filter((c) => {
-      return (
-        // filter by passed components
-        (!components.length || componentsMap.get(c.name)) &&
-        (action === 'comment' || !c.addon)
-      );
+      // no components passed meaning - deploy all
+      if (!components.length) {
+        // deploy all components which are not marked as addon=true
+        return !c.addon;
+      }
+      return componentsMap.get(c.name);
     })
     .map(({ name, chart, version, needs, addon, values }) => {
       if (!chart) {
