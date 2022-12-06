@@ -3,7 +3,8 @@ const yaml = require('js-yaml');
 const bluebird = require('bluebird');
 const { sub } = require("date-fns");
 
-const getConfigFile = async (context, owner) => {
+const getConfigFile = async (app, context, owner) => {
+  app.log.info('getConfigFile>');
   const repoPaths = {
     '.infraway': 'config.yaml',
     'charts': '.infraway/config.yaml',
@@ -76,6 +77,7 @@ const getLatestCommitInPullRequest = async (context, owner, repo, pullNumber) =>
 };
 
 const getStalePulls = async (app, context, owner) => {
+  app.log.info('getStalePulls>');
   const {
     deploy,
     stale_pull_cleanup: cleanupPolicy,
@@ -105,19 +107,25 @@ const getStalePulls = async (app, context, owner) => {
   }, []);
 }
 
+const updatePulls = async (app, context, owner) => {
+  const pulls = await getStalePulls(app, context, owner);
+  app.log.info(`Found ${pulls.length} stale pulls`);
+  await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
+    app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
+    // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+    // await deleteDeployments(app, context, owner, payloads);
+  }, Promise.resolve());
+}
+
 const stalePromise = {};
 const syncStale = async (app, context, owner) => {
+  await updatePulls(app, context, owner);
+
   if (!stalePromise[owner]) {
     stalePromise[owner] = new Promise((resolve, reject) => {
       try {
         setInterval(async () => {
-          const pulls = await getStalePulls(app, context, owner);
-          app.log.info(`Found ${pulls.length} stale pulls`);
-          await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
-            app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
-            // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
-            // await deleteDeployments(app, context, owner, payloads);
-          }, Promise.resolve());
+          await updatePulls(app, context, owner);
         }, 20 * 60 * 1000);
       } catch (e) {
         reject(e);
@@ -130,16 +138,16 @@ const configMap = {};
 const configMapPromise = {};
 const getConfig = (owner) => configMap[owner];
 
-const syncConfig = async (context, owner) => {
+const syncConfig = async (app, context, owner) => {
   if (!configMap[owner]) {
-    configMap[owner] = await getConfigFile(context, owner);
+    configMap[owner] = await getConfigFile(app, context, owner);
   }
 
   if (!configMapPromise[owner]) {
     configMapPromise[owner] = new Promise((resolve, reject) => {
       try {
         setInterval(async () => {
-          configMap[owner] = await getConfigFile(context, owner);
+          configMap[owner] = await getConfigFile(app, context, owner);
         }, 20 * 60 * 1000);
       } catch (e) {
         reject(e);
