@@ -91,7 +91,7 @@ const getStalePulls = async (app, context, owner) => {
   app.log.info(`Checking repos for stale rule: X < ${filterDate.toISOString()}`);
   app.log.info(repos);
   return repos.reduce(async (acc, repo) => {
-    const foundPulls = await context.octokit.pulls.list({
+    const { data: foundPulls } = await context.octokit.pulls.list({
       owner,
       repo,
       state: 'open',
