@@ -75,7 +75,7 @@ const getLatestCommitInPullRequest = async (context, owner, repo, pullNumber) =>
   return pull.data.head.sha;
 };
 
-const getStalePulls = async (context, owner) => {
+const getStalePulls = async (app, context, owner) => {
   const {
     deploy,
     stale_pull_cleanup: cleanupPolicy,
@@ -86,6 +86,8 @@ const getStalePulls = async (context, owner) => {
   const duration = (cleanupPolicy.duration || '7 days').split(' ');
   const filterDate = sub(new Date(), { [duration[1]]: parseInt(duration[0], 10) });
   const repos = deploy.map((d) => d.name);
+  app.log.info(`Checking repos for stale rule: X < ${filterDate.toISOString()}`);
+  app.log.info(repos);
   return repos.reduce(async (acc, repo) => {
     const foundPulls = await context.octokit.pulls.list({
       owner,
@@ -94,6 +96,7 @@ const getStalePulls = async (context, owner) => {
       sort: 'updated',
       direction: 'asc',
     });
+    app.log.info(foundPulls);
     acc.push(
       ...foundPulls
         .filter((p) => new Date(p.updated_at) < filterDate)
@@ -106,14 +109,19 @@ const stalePromise = {};
 const syncStale = async (app, context, owner) => {
   if (!stalePromise[owner]) {
     stalePromise[owner] = new Promise((resolve, reject) => {
-      setInterval(async () => {
-        const pulls = await getStalePulls(context, owner);
-        await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
-          app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
-          // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
-          // await deleteDeployments(app, context, owner, payloads);
-        }, Promise.resolve());
-      }, 20 * 60 * 1000);
+      try {
+        setInterval(async () => {
+          const pulls = await getStalePulls(app, context, owner);
+          app.log.info(`Found ${pulls.length} stale pulls`);
+          await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
+            app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
+            // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+            // await deleteDeployments(app, context, owner, payloads);
+          }, Promise.resolve());
+        }, 20 * 60 * 1000);
+      } catch (e) {
+        reject(e);
+      }
     });
   }
 }
@@ -129,9 +137,13 @@ const syncConfig = async (context, owner) => {
 
   if (!configMapPromise[owner]) {
     configMapPromise[owner] = new Promise((resolve, reject) => {
-      setInterval(async () => {
-        configMap[owner] = await getConfigFile(context, owner);
-      }, 20 * 60 * 1000);
+      try {
+        setInterval(async () => {
+          configMap[owner] = await getConfigFile(context, owner);
+        }, 20 * 60 * 1000);
+      } catch (e) {
+        reject(e);
+      }
     });
   }
 }
