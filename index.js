@@ -104,6 +104,7 @@ const getStalePulls = async (app, context, owner) => {
         .filter((p) => new Date(p.updated_at) < filterDate)
         .map((p) => ({ pullNumber: p.number, owner, repo }))
     );
+    return acc;
   }, []);
 }
 
