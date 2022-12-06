@@ -91,6 +91,7 @@ const getStalePulls = async (app, context, owner) => {
   app.log.info(`Checking repos for stale rule: X < ${filterDate.toISOString()}`);
   app.log.info(repos);
   return repos.reduce(async (acc, repo) => {
+    const previous = await acc;
     const { data: foundPulls } = await context.octokit.pulls.list({
       owner,
       repo,
@@ -99,13 +100,13 @@ const getStalePulls = async (app, context, owner) => {
       direction: 'asc',
     });
     app.log.info(`Found ${foundPulls.length} pulls for repo ${repo}`);
-    acc.push(
+    return [
+      ...previous,
       ...foundPulls
         .filter((p) => new Date(p.updated_at) < filterDate)
-        .map((p) => ({ pullNumber: p.number, owner, repo }))
-    );
-    return acc;
-  }, []);
+        .map((p) => ({ pullNumber: p.number, owner, repo })),
+    ];
+  }, Promise.resolve([]));
 }
 
 const updatePulls = async (app, context, owner) => {
