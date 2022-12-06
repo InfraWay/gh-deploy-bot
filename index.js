@@ -110,6 +110,7 @@ const getStalePulls = async (app, context, owner) => {
 const updatePulls = async (app, context, owner) => {
   const pulls = await getStalePulls(app, context, owner);
   app.log.info(`Found ${pulls.length} stale pulls`);
+  app.log.info(pulls);
   await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
     app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
     // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
