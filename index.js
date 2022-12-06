@@ -115,14 +115,14 @@ const updatePulls = async (app, context, owner) => {
   app.log.info(pulls);
   await pulls.reduce(async (_, { owner, repo, pullNumber }) => {
     app.log.info(`Cleaning up resources for stale pull: ${owner}/${repo}/pull/${pullNumber}`);
-    // const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
-    // await deleteDeployments(app, context, owner, payloads);
+    const payloads = await getDeletePayloads(context, { owner, repo, pullNumber });
+    await deleteDeployments(app, context, owner, payloads);
   }, Promise.resolve());
 }
 
 const stalePromise = {};
 const syncStale = async (app, context, owner) => {
-  await updatePulls(app, context, owner);
+  // await updatePulls(app, context, owner);
 
   if (!stalePromise[owner]) {
     stalePromise[owner] = new Promise((resolve, reject) => {
