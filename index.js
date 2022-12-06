@@ -98,7 +98,7 @@ const getStalePulls = async (app, context, owner) => {
       sort: 'updated',
       direction: 'asc',
     });
-    app.log.info(foundPulls);
+    app.log.info(`Found ${foundPulls.length} pulls for repo ${repo}`);
     acc.push(
       ...foundPulls
         .filter((p) => new Date(p.updated_at) < filterDate)
