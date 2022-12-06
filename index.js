@@ -335,7 +335,7 @@ module.exports = (app) => {
       const pullNumber = context.payload.issue.html_url.indexOf('/pull/')
         ? context.payload.issue.number : null;
 
-      await sync(context, owner);
+      await sync(app, context, owner);
 
       if (!pullNumber) {
         app.log.info('Cannot find pull request. Deploy dismissed.');
@@ -371,7 +371,7 @@ module.exports = (app) => {
       } = context.payload;
       app.log.info('push');
       app.log.info({ owner, repo, sha, ctx });
-      await sync(context, owner);
+      await sync(app, context, owner);
 
       const config = getConfig(owner);
       const { commit: commitEvent } = config.events || { commit: 'deploy' };
@@ -405,7 +405,7 @@ module.exports = (app) => {
       }
       app.log.info(`pull_request.${action}`);
       app.log.info({ owner, repo, ctx, pullNumber });
-      await sync(context, owner);
+      await sync(app, context, owner);
 
       const config = getConfig(owner);
       const { pull_request: prEvent } = config.events || { pull_request: 'deploy' };
