@@ -157,7 +157,7 @@ const syncConfig = async (app, context, owner) => {
 }
 
 const sync = async (app, context, owner) => {
-  await syncConfig(context, owner);
+  await syncConfig(app, context, owner);
   await syncStale(app, context, owner);
 };
 
