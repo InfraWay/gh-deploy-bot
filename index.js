@@ -83,7 +83,7 @@ const getStalePulls = async (app, context, owner) => {
     stale_pull_cleanup: cleanupPolicy,
   } = getConfig(owner);
   if (!cleanupPolicy.enabled) {
-    return;
+    return [];
   }
   const duration = (cleanupPolicy.duration || '7 days').split(' ');
   const filterDate = sub(new Date(), { [duration[1]]: parseInt(duration[0], 10) });
