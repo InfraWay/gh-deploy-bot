@@ -1,7 +1,8 @@
 domain: domain.tech
 
 events:
-  pull_request: "deploy" # or "ignore", deploy by default
+  pull_request_opened: "deploy" # or "ignore", deploy by default
+  pull_request_reopened: "deploy" # or "ignore", deploy by default
   commit: "deploy" # or "ignore", deploy by default
 
 stale_pull_cleanup:

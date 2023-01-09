@@ -431,7 +431,7 @@ module.exports = (app) => {
       await sync(app, context, owner);
 
       const config = getConfig(owner);
-      const { pull_request: prEvent } = config.events || { pull_request: 'deploy' };
+      const { [`pull_request_${action}`]: prEvent } = config.events || { [`pull_request_${action}`]: 'deploy' };
       if (prEvent === 'ignore') {
         return;
       }
