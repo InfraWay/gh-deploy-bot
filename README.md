@@ -2,7 +2,7 @@
 
 This is a GitHub bot that simplifies the process of deployment for organizations from multiple interconnected repositories.
 
-It listens certain [GitHub events](https://docs.github.com/en/developers/webhooks-and-events/events) (pull request, commit) and triggers a new deployment to be created for defined applications.
+It listens to certain [GitHub events](https://docs.github.com/en/developers/webhooks-and-events/events) (pull request, commit) and triggers a new deployment to be created for defined applications.
 
 That allows your dev team to develop and deploy their code to personal dev environments e.g. `https://pull-123.customer-domain.com` managed by Kubernetes.
 
