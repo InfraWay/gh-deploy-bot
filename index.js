@@ -264,6 +264,33 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
   }, Promise.resolve([]));
 }
 
+const getLockPayloads = async (context, { owner, repo, pullNumber, sha }) => {
+  const config = getConfig(owner);
+  const domain = config.domain;
+  // find deploy by repo
+  const deploy = config.deploy.find((d) => d.name === repo);
+  if (!deploy) {
+    return [];
+  }
+
+  const charts = deploy.components
+    .map(({ name }) => ({ name }));
+
+  return charts.reduce(async (acc, { name }) => {
+    const val = await acc;
+    const description = `Lock ${name} for ${repo}/pull/${pullNumber}`;
+    const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
+    return [...val, {
+      repo,
+      component: name.replace('.', '-'),
+      description,
+      environment,
+      domain: `${environment}.${domain}`,
+      action: 'lock',
+    }];
+  }, Promise.resolve([]));
+}
+
 const createDeployments = async (app, context, owner, payloads) => {
   await bluebird.mapSeries(payloads, async ({ repo, component, chart, version, gitVersion, environment, description, domain, action, values, addon = false }) => {
     app.log.info({ repo, component, chart, version, gitVersion, environment, description, domain, action, values });
@@ -330,6 +357,28 @@ const deleteDeployments = async (app, context, owner, payloads) => {
   // );
 };
 
+const lockDeployments = async (app, context, owner, payloads) => {
+  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain, action }) => {
+    app.log.info({ repo, component, environment, description, domain, action });
+    const res = await context.octokit.repos.createDeployment({
+      owner: owner,
+      repo: 'charts',
+      ref: 'master', // The ref to deploy. This can be a branch, tag, or SHA.
+      task: 'lock', // Specifies a task to execute (e.g., deploy or deploy:migrations).
+      auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
+      required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
+      payload: {
+        repo, component, domain, action, environment,
+      }, // JSON payload with extra information about the deployment. Default: ""
+      environment, // Name for the target deployment environment (e.g., production, staging, qa)
+      description, // Short description of the deployment
+      transient_environment: true, // Specifies if the given environment is specific to the deployment and will no longer exist at some point in the future.
+      production_environment: false, // Specifies if the given environment is one that end-users directly interact with.
+    });
+    app.log.info(`Created lock deployment #${res.data.id} for pull request ${environment}`);
+  });
+};
+
 /**
  * This is the main entrypoint to your Probot app
  * @param {import('probot').Probot} app
@@ -339,49 +388,59 @@ module.exports = (app) => {
   app.on(
     "issue_comment.created",
     async (context) => {
-      const commandRegex = /^[\\\|\/\#]deploy([^$]*)$/;
       const {
         comment: { body: comment },
         repository: { owner: { login: owner }, name: repo },
       } = context.payload;
-      let matched;
-      if (
-        !comment ||
-        !(matched = comment.toLowerCase().match(commandRegex))
-      ) {
-        app.log.info(`Missing comment body or comment doesn't start with /deploy message, body: ${comment}`);
+      if (!comment) {
+        app.log.info(`Missing comment body`);
         return;
       }
+
       app.log.info('issue_comment.created');
       app.log.info(context.payload);
 
       const pullNumber = context.payload.issue.html_url.indexOf('/pull/')
         ? context.payload.issue.number : null;
 
-      await sync(app, context, owner);
-
       if (!pullNumber) {
-        app.log.info('Cannot find pull request. Deploy dismissed.');
+        app.log.info('Cannot find pull request. Command dismissed.');
         return;
       }
 
-      const components = matched[1]
-        .split(/\s|\n/)
-        .filter(Boolean)
-        .map((component) => {
-          const parts = component.split(':');
-          return {
-            component: parts[0],
-            version: parts[1],
-          };
-        });
+      // lock flow
+      const commandLockRegex = /^[\\\|\/\#]lock([^$]*)$/;
+      if ((comment.toLowerCase().match(commandLockRegex))) {
+        const payloads = await getLockPayloads(
+          context, { owner, repo, pullNumber }
+        );
+        await lockDeployments(app, context, owner, payloads);
+        return;
+      }
 
-      app.log.info('extracted comment components');
-      app.log.info(JSON.stringify(components));
-      const payloads = await getDeployPayloads(
-        context, { owner, repo, pullNumber }, components, 'comment', app.log,
-      );
-      await createDeployments(app, context, owner, payloads);
+      // deploy flow
+      let matched;
+      const commandDeployRegex = /^[\\\|\/\#]deploy([^$]*)$/;
+      if ((matched = comment.toLowerCase().match(commandDeployRegex))) {
+        await sync(app, context, owner);
+        const components = matched[1]
+          .split(/\s|\n/)
+          .filter(Boolean)
+          .map((component) => {
+            const parts = component.split(':');
+            return {
+              component: parts[0],
+              version: parts[1],
+            };
+          });
+
+        app.log.info('extracted comment components');
+        app.log.info(JSON.stringify(components));
+        const payloads = await getDeployPayloads(
+          context, { owner, repo, pullNumber }, components, 'comment', app.log,
+        );
+        await createDeployments(app, context, owner, payloads);
+      }
     },
   );
   app.on(
