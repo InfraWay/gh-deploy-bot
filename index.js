@@ -246,22 +246,15 @@ const getDeletePayloads = async (context, { owner, repo, pullNumber, sha }) => {
     return [];
   }
 
-  const charts = deploy.components
-    .map(({ name }) => ({ name }));
-
-  return charts.reduce(async (acc, { name }) => {
-    const val = await acc;
-    const description = `Delete ${name} for ${repo}/pull/${pullNumber}`;
-    const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
-    return [...val, {
-      repo,
-      component: name.replace('.', '-'),
-      description,
-      environment,
-      domain: `${environment}.${domain}`,
-      action: 'delete',
-    }];
-  }, Promise.resolve([]));
+  const description = `Delete ${repo}/pull/${pullNumber}`;
+  const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
+  return [{
+    repo,
+    description,
+    environment,
+    domain: `${environment}.${domain}`,
+    action: 'delete',
+  }];
 }
 
 const getLockPayloads = async (context, { owner, repo, pullNumber, sha }) => {
@@ -273,22 +266,15 @@ const getLockPayloads = async (context, { owner, repo, pullNumber, sha }) => {
     return [];
   }
 
-  const charts = deploy.components
-    .map(({ name }) => ({ name }));
-
-  return charts.reduce(async (acc, { name }) => {
-    const val = await acc;
-    const description = `Lock ${name} for ${repo}/pull/${pullNumber}`;
-    const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
-    return [...val, {
-      repo,
-      component: name.replace('.', '-'),
-      description,
-      environment,
-      domain: `${environment}.${domain}`,
-      action: 'lock',
-    }];
-  }, Promise.resolve([]));
+  const description = `Lock ${repo}/pull/${pullNumber}`;
+  const environment = `${repo.replace('.', '-')}-pull-${pullNumber}`;
+  return [{
+    repo,
+    description,
+    environment,
+    domain: `${environment}.${domain}`,
+    action: 'lock',
+  }];
 }
 
 const createDeployments = async (app, context, owner, payloads) => {
@@ -314,8 +300,8 @@ const createDeployments = async (app, context, owner, payloads) => {
 };
 
 const deleteDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain, action }) => {
-    app.log.info({ repo, component, environment, description, domain, action });
+  await bluebird.mapSeries(payloads, async ({ repo, environment, description, domain, action }) => {
+    app.log.info({ repo, environment, description, domain, action });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -324,7 +310,7 @@ const deleteDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo, component, domain, action, environment,
+        repo, domain, action, environment,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
@@ -358,8 +344,8 @@ const deleteDeployments = async (app, context, owner, payloads) => {
 };
 
 const lockDeployments = async (app, context, owner, payloads) => {
-  await bluebird.mapSeries(payloads, async ({ repo, component, environment, description, domain, action }) => {
-    app.log.info({ repo, component, environment, description, domain, action });
+  await bluebird.mapSeries(payloads, async ({ repo, environment, description, domain, action }) => {
+    app.log.info({ repo, environment, description, domain, action });
     const res = await context.octokit.repos.createDeployment({
       owner: owner,
       repo: 'charts',
@@ -368,7 +354,7 @@ const lockDeployments = async (app, context, owner, payloads) => {
       auto_merge: false, // Attempts to automatically merge the default branch into the requested ref, if it is behind the default branch.
       required_contexts: [], // The status contexts to verify against commit status checks. If this parameter is omitted, then all unique contexts will be verified before a deployment is created. To bypass checking entirely pass an empty array. Defaults to all unique contexts.
       payload: {
-        repo, component, domain, action, environment,
+        repo, domain, action, environment,
       }, // JSON payload with extra information about the deployment. Default: ""
       environment, // Name for the target deployment environment (e.g., production, staging, qa)
       description, // Short description of the deployment
