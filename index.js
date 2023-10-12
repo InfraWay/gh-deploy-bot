@@ -411,6 +411,7 @@ module.exports = (app) => {
       // lock flow
       const commandLockRegex = /^[\\\|\/\#]lock([^$]*)$/;
       if ((comment.toLowerCase().match(commandLockRegex))) {
+        await sync(app, context, owner);
         const payloads = await getLockPayloads(
           context, { owner, repo, pullNumber }
         );
